@@ -12400,7 +12400,7 @@ Chainer = function(request, path, name, contextTree, fn) {
 module.exports = Chainer;
 
 
-},{"./plus":11,"./verb-methods":14}],3:[function(require,module,exports){
+},{"./plus":12,"./verb-methods":15}],3:[function(require,module,exports){
 var DEFAULT_HEADER, OBJECT_MATCHER, PREVIEW_HEADERS, TREE_OPTIONS, URL_VALIDATOR;
 
 URL_VALIDATOR = /^(https?:\/\/[^\/]+)?(\/api\/v3)?\/(zen|octocat|users|organizations|issues|gists|emojis|markdown|meta|rate_limit|feeds|events|notifications|notifications\/threads(\/[^\/]+)|notifications\/threads(\/[^\/]+)\/subscription|gitignore\/templates(\/[^\/]+)?|user|user\/(repos|orgs|followers|following(\/[^\/]+)?|emails(\/[^\/]+)?|issues|starred|starred(\/[^\/]+){2}|teams)|orgs\/[^\/]+|orgs\/[^\/]+\/(repos|issues|members|events|teams)|teams\/[^\/]+|teams\/[^\/]+\/(members(\/[^\/]+)?|memberships\/[^\/]+|repos|repos(\/[^\/]+){2})|users\/[^\/]+|users\/[^\/]+\/(repos|orgs|gists|followers|following(\/[^\/]+){0,2}|keys|starred|received_events(\/public)?|events(\/public)?|events\/orgs\/[^\/]+)|search\/(repositories|issues|users|code)|gists\/(public|starred|([a-f0-9]{20}|[0-9]+)|([a-f0-9]{20}|[0-9]+)\/forks|([a-f0-9]{20}|[0-9]+)\/comments(\/[0-9]+)?|([a-f0-9]{20}|[0-9]+)\/star)|repos(\/[^\/]+){2}|repos(\/[^\/]+){2}\/(readme|tarball(\/[^\/]+)?|zipball(\/[^\/]+)?|compare\/([^\.{3}]+)\.{3}([^\.{3}]+)|deployments(\/[0-9]+)?|deployments\/[0-9]+\/statuses(\/[0-9]+)?|hooks|hooks\/[^\/]+|hooks\/[^\/]+\/tests|assignees|languages|teams|tags|branches(\/[^\/]+){0,2}|contributors|subscribers|subscription|stargazers|comments(\/[0-9]+)?|downloads(\/[0-9]+)?|forks|milestones|milestones\/[0-9]+|milestones\/[0-9]+\/labels|labels(\/[^\/]+)?|releases|releases\/([0-9]+)|releases\/([0-9]+)\/assets|releases\/latest|releases\/tags\/([^\/]+)|releases\/assets\/([0-9]+)|events|notifications|merges|statuses\/[a-f0-9]{40}|pages|pages\/builds|pages\/builds\/latest|commits|commits\/[a-f0-9]{40}|commits\/[a-f0-9]{40}\/(comments|status|statuses)?|contents\/|contents(\/[^\/]+)*|collaborators(\/[^\/]+)?|(issues|pulls)|(issues|pulls)\/(events|events\/[0-9]+|comments(\/[0-9]+)?|[0-9]+|[0-9]+\/events|[0-9]+\/comments|[0-9]+\/labels(\/[^\/]+)?)|pulls\/[0-9]+\/(files|commits)|git\/(refs|refs\/(.+|heads(\/[^\/]+)?|tags(\/[^\/]+)?)|trees(\/[^\/]+)?|blobs(\/[a-f0-9]{40}$)?|commits(\/[a-f0-9]{40}$)?)|stats\/(contributors|commit_activity|code_frequency|participation|punch_card))|licenses|licenses\/([^\/]+)|authorizations|authorizations\/((\d+)|clients\/([^\/]{20})|clients\/([^\/]{20})\/([^\/]+))|applications\/([^\/]{20})\/tokens|applications\/([^\/]{20})\/tokens\/([^\/]+)|enterprise\/(settings\/license|stats\/(issues|hooks|milestones|orgs|comments|pages|users|gists|pulls|repos|all))|staff\/indexing_jobs|users\/[^\/]+\/(site_admin|suspended)|setup\/api\/(start|upgrade|configcheck|configure|settings(authorized-keys)?|maintenance))$/;
@@ -12930,7 +12930,114 @@ module.exports = Octokat;
 
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./chainer":2,"./grammar":3,"./helper-promise":5,"./plugin-middleware-response":9,"./plus":11,"./replacer":12,"./request":13,"./verb-methods":14}],8:[function(require,module,exports){
+},{"./chainer":2,"./grammar":3,"./helper-promise":5,"./plugin-middleware-response":10,"./plus":12,"./replacer":13,"./request":14,"./verb-methods":15}],8:[function(require,module,exports){
+var CAMEL_CASE, CamelCase, Chainer, OBJECT_MATCHER, PAGED_RESULTS, PagedResults, TREE_OPTIONS, plus, ref, toPromise, toQueryString;
+
+plus = require('./plus');
+
+toPromise = require('./helper-promise').toPromise;
+
+toQueryString = require('./helper-querystring');
+
+ref = require('./grammar'), TREE_OPTIONS = ref.TREE_OPTIONS, OBJECT_MATCHER = ref.OBJECT_MATCHER;
+
+Chainer = require('./chainer');
+
+CAMEL_CASE = new (CamelCase = (function() {
+  function CamelCase() {}
+
+  CamelCase.prototype.responseMiddleware = function(arg) {
+    var data;
+    data = arg.data;
+    data = this.replace(data);
+    return {
+      data: data
+    };
+  };
+
+  CamelCase.prototype.replace = function(data) {
+    if (Array.isArray(data)) {
+      return this._replaceArray(data);
+    } else if (typeof data === 'function') {
+      return data;
+    } else if (data === Object(data)) {
+      return this._replaceObject(data);
+    } else {
+      return data;
+    }
+  };
+
+  CamelCase.prototype._replaceObject = function(orig) {
+    var acc, i, key, len, ref1, value;
+    acc = {};
+    ref1 = Object.keys(orig);
+    for (i = 0, len = ref1.length; i < len; i++) {
+      key = ref1[i];
+      value = orig[key];
+      this._replaceKeyValue(acc, key, value);
+    }
+    return acc;
+  };
+
+  CamelCase.prototype._replaceArray = function(orig) {
+    var arr, i, item, key, len, ref1, value;
+    arr = (function() {
+      var i, len, results;
+      results = [];
+      for (i = 0, len = orig.length; i < len; i++) {
+        item = orig[i];
+        results.push(this.replace(item));
+      }
+      return results;
+    }).call(this);
+    ref1 = Object.keys(orig);
+    for (i = 0, len = ref1.length; i < len; i++) {
+      key = ref1[i];
+      value = orig[key];
+      this._replaceKeyValue(arr, key, value);
+    }
+    return arr;
+  };
+
+  CamelCase.prototype._replaceKeyValue = function(acc, key, value) {
+    return acc[plus.camelize(key)] = this.replace(value);
+  };
+
+  return CamelCase;
+
+})());
+
+PAGED_RESULTS = new (PagedResults = (function() {
+  function PagedResults() {}
+
+  PagedResults.prototype.responseMiddleware = function(arg) {
+    var data, discard, href, i, jqXHR, len, links, part, ref1, ref2, rel;
+    jqXHR = arg.jqXHR, data = arg.data;
+    if (Array.isArray(data)) {
+      links = jqXHR.getResponseHeader('Link');
+      ref1 = (links != null ? links.split(',') : void 0) || [];
+      for (i = 0, len = ref1.length; i < len; i++) {
+        part = ref1[i];
+        ref2 = part.match(/<([^>]+)>;\ rel="([^"]+)"/), discard = ref2[0], href = ref2[1], rel = ref2[2];
+        data[rel + "_page_url"] = href;
+      }
+      return {
+        data: data
+      };
+    }
+  };
+
+  return PagedResults;
+
+})());
+
+module.exports = {
+  CAMEL_CASE: CAMEL_CASE,
+  PAGED_RESULTS: PAGED_RESULTS
+};
+
+
+},{"./chainer":2,"./grammar":3,"./helper-promise":5,"./helper-querystring":6,"./plus":12}],9:[function(require,module,exports){
 var AUTHORIZATION, DEFAULT_HEADER, PATH_TEST, PREVIEW_APIS, URL_VALIDATOR, USE_POST_INSTEAD_OF_PATCH, base64encode, ref;
 
 ref = require('./grammar'), URL_VALIDATOR = ref.URL_VALIDATOR, DEFAULT_HEADER = ref.DEFAULT_HEADER;
@@ -12998,8 +13105,8 @@ AUTHORIZATION = {
 module.exports = [USE_POST_INSTEAD_OF_PATCH, PREVIEW_APIS, AUTHORIZATION];
 
 
-},{"./grammar":3,"./helper-base64":4}],9:[function(require,module,exports){
-var CAMEL_CASE, CamelCase, Chainer, OBJECT_MATCHER, TREE_OPTIONS, plus, ref, toPromise, toQueryString;
+},{"./grammar":3,"./helper-base64":4}],10:[function(require,module,exports){
+var CAMEL_CASE, CamelCase, Chainer, OBJECT_MATCHER, PAGED_RESULTS, PagedResults, TREE_OPTIONS, plus, ref, toPromise, toQueryString;
 
 plus = require('./plus');
 
@@ -13011,7 +13118,7 @@ ref = require('./grammar'), TREE_OPTIONS = ref.TREE_OPTIONS, OBJECT_MATCHER = re
 
 Chainer = require('./chainer');
 
-CamelCase = (function() {
+CAMEL_CASE = new (CamelCase = (function() {
   function CamelCase() {}
 
   CamelCase.prototype.responseMiddleware = function(arg) {
@@ -13073,16 +13180,40 @@ CamelCase = (function() {
 
   return CamelCase;
 
-})();
+})());
 
-CAMEL_CASE = new CamelCase;
+PAGED_RESULTS = new (PagedResults = (function() {
+  function PagedResults() {}
+
+  PagedResults.prototype.responseMiddleware = function(arg) {
+    var data, discard, href, i, jqXHR, len, links, part, ref1, ref2, rel;
+    jqXHR = arg.jqXHR, data = arg.data;
+    if (Array.isArray(data)) {
+      data = data.slice(0);
+      links = jqXHR.getResponseHeader('Link');
+      ref1 = (links != null ? links.split(',') : void 0) || [];
+      for (i = 0, len = ref1.length; i < len; i++) {
+        part = ref1[i];
+        ref2 = part.match(/<([^>]+)>;\ rel="([^"]+)"/), discard = ref2[0], href = ref2[1], rel = ref2[2];
+        data[rel + "_page_url"] = href;
+      }
+      return {
+        data: data
+      };
+    }
+  };
+
+  return PagedResults;
+
+})());
 
 module.exports = {
-  CAMEL_CASE: CAMEL_CASE
+  CAMEL_CASE: CAMEL_CASE,
+  PAGED_RESULTS: PAGED_RESULTS
 };
 
 
-},{"./chainer":2,"./grammar":3,"./helper-promise":5,"./helper-querystring":6,"./plus":11}],10:[function(require,module,exports){
+},{"./chainer":2,"./grammar":3,"./helper-promise":5,"./helper-querystring":6,"./plus":12}],11:[function(require,module,exports){
 var toQueryString,
   slice = [].slice;
 
@@ -13167,7 +13298,7 @@ module.exports = {
 };
 
 
-},{"./helper-querystring":6}],11:[function(require,module,exports){
+},{"./helper-querystring":6}],12:[function(require,module,exports){
 var plus;
 
 plus = {
@@ -13209,7 +13340,7 @@ plus = {
 module.exports = plus;
 
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 var Chainer, OBJECT_MATCHER, Replacer, TREE_OPTIONS, plus, ref, toPromise, toQueryString,
   slice = [].slice;
 
@@ -13393,8 +13524,8 @@ Replacer = (function() {
 module.exports = Replacer;
 
 
-},{"./chainer":2,"./grammar":3,"./helper-promise":5,"./helper-querystring":6,"./plus":11}],13:[function(require,module,exports){
-var DEFAULT_HEADER, ETagResponse, MIDDLEWARE_REQUEST_PLUGINS, Request, _, ajax, base64encode, userAgent;
+},{"./chainer":2,"./grammar":3,"./helper-promise":5,"./helper-querystring":6,"./plus":12}],14:[function(require,module,exports){
+var DEFAULT_HEADER, ETagResponse, MIDDLEWARE_CACHE_HANDLER, MIDDLEWARE_REQUEST_PLUGINS, MIDDLEWARE_RESPONSE_PLUGINS, Request, _, ajax, base64encode, userAgent;
 
 _ = require('lodash');
 
@@ -13403,6 +13534,10 @@ base64encode = require('./helper-base64');
 DEFAULT_HEADER = require('./grammar').DEFAULT_HEADER;
 
 MIDDLEWARE_REQUEST_PLUGINS = require('./plugin-middleware-request');
+
+MIDDLEWARE_RESPONSE_PLUGINS = require('./plugin-middleware-response');
+
+MIDDLEWARE_CACHE_HANDLER = require('./plugin-cache-handler');
 
 if (typeof window === "undefined" || window === null) {
   userAgent = 'octokat.js';
@@ -13477,6 +13612,9 @@ Request = function(clientOptions) {
   _cachedETags = {};
   cacheHandler = clientOptions.cacheHandler || {
     get: function(method, path) {
+      if (_cachedETags[method + " " + path]) {
+        console.log('CACHEHANDLER GETTING ', method, path);
+      }
       return _cachedETags[method + " " + path];
     },
     add: function(method, path, eTag, data, status) {
@@ -13575,7 +13713,7 @@ Request = function(clientOptions) {
       emitter.emit('start', method, path, data, options);
     }
     return ajax(ajaxConfig, function(err, val) {
-      var converted, discard, eTag, eTagResponse, emitterRate, href, i, jqXHR, json, k, l, len1, links, part, rateLimit, rateLimitRemaining, rateLimitReset, ref1, ref2, ref3, rel;
+      var acc2, converted, eTag, eTagResponse, emitterRate, i, jqXHR, json, k, key, rateLimit, rateLimitRemaining, rateLimitReset, ref1, value;
       jqXHR = err || val;
       if (emitter) {
         rateLimit = parseFloat(jqXHR.getResponseHeader('X-RateLimit-Limit'));
@@ -13606,19 +13744,22 @@ Request = function(clientOptions) {
         } else if (!(jqXHR.status === 204 && options.isBoolean)) {
           if (jqXHR.responseText && ajaxConfig.dataType === 'json') {
             data = JSON.parse(jqXHR.responseText);
-            links = jqXHR.getResponseHeader('Link');
-            ref1 = (links != null ? links.split(',') : void 0) || [];
-            for (k = 0, len1 = ref1.length; k < len1; k++) {
-              part = ref1[k];
-              ref2 = part.match(/<([^>]+)>;\ rel="([^"]+)"/), discard = ref2[0], href = ref2[1], rel = ref2[2];
-              data[rel + "_page_url"] = href;
+            acc = {
+              jqXHR: jqXHR,
+              data: data
+            };
+            for (key in MIDDLEWARE_RESPONSE_PLUGINS) {
+              value = MIDDLEWARE_RESPONSE_PLUGINS[key];
+              acc2 = value.responseMiddleware(acc);
+              _.extend(acc, acc2);
             }
+            data = acc.data;
           } else {
             data = jqXHR.responseText;
           }
           if (method === 'GET' && options.isBase64) {
             converted = '';
-            for (i = l = 0, ref3 = data.length; 0 <= ref3 ? l < ref3 : l > ref3; i = 0 <= ref3 ? ++l : --l) {
+            for (i = k = 0, ref1 = data.length; 0 <= ref1 ? k < ref1 : k > ref1; i = 0 <= ref1 ? ++k : --k) {
               converted += String.fromCharCode(data.charCodeAt(i) & 0xff);
             }
             data = converted;
@@ -13653,7 +13794,7 @@ Request = function(clientOptions) {
 module.exports = Request;
 
 
-},{"./grammar":3,"./helper-base64":4,"./plugin-middleware-request":8,"lodash":1}],14:[function(require,module,exports){
+},{"./grammar":3,"./helper-base64":4,"./plugin-cache-handler":8,"./plugin-middleware-request":9,"./plugin-middleware-response":10,"lodash":1}],15:[function(require,module,exports){
 var SIMPLE_VERBS_PLUGIN, URL_TESTER, URL_VALIDATOR, injectVerbMethods, toPromise, toQueryString,
   slice = [].slice;
 
@@ -13700,5 +13841,5 @@ injectVerbMethods = function(request, path, obj) {
 module.exports = injectVerbMethods;
 
 
-},{"./grammar":3,"./helper-promise":5,"./helper-querystring":6,"./plugin-simple-verbs":10}]},{},[7])(7)
+},{"./grammar":3,"./helper-promise":5,"./helper-querystring":6,"./plugin-simple-verbs":11}]},{},[7])(7)
 });
