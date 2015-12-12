@@ -12931,113 +12931,64 @@ module.exports = Octokat;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{"./chainer":2,"./grammar":3,"./helper-promise":5,"./plugin-middleware-response":10,"./plus":12,"./replacer":13,"./request":14,"./verb-methods":15}],8:[function(require,module,exports){
-var CAMEL_CASE, CamelCase, Chainer, OBJECT_MATCHER, PAGED_RESULTS, PagedResults, TREE_OPTIONS, plus, ref, toPromise, toQueryString;
+var CacheMiddleware;
 
-plus = require('./plus');
+module.exports = new (CacheMiddleware = (function() {
+  function CacheMiddleware() {
+    this._cachedETags = {};
+  }
 
-toPromise = require('./helper-promise').toPromise;
+  CacheMiddleware.prototype.get = function(method, path) {
+    return this._cachedETags[method + " " + path];
+  };
 
-toQueryString = require('./helper-querystring');
-
-ref = require('./grammar'), TREE_OPTIONS = ref.TREE_OPTIONS, OBJECT_MATCHER = ref.OBJECT_MATCHER;
-
-Chainer = require('./chainer');
-
-CAMEL_CASE = new (CamelCase = (function() {
-  function CamelCase() {}
-
-  CamelCase.prototype.responseMiddleware = function(arg) {
-    var data;
-    data = arg.data;
-    data = this.replace(data);
-    return {
-      data: data
+  CacheMiddleware.prototype.add = function(method, path, eTag, data, status) {
+    return this._cachedETags[method + " " + path] = {
+      eTag: eTag,
+      data: data,
+      status: status
     };
   };
 
-  CamelCase.prototype.replace = function(data) {
-    if (Array.isArray(data)) {
-      return this._replaceArray(data);
-    } else if (typeof data === 'function') {
-      return data;
-    } else if (data === Object(data)) {
-      return this._replaceObject(data);
+  CacheMiddleware.prototype.requestMiddleware = function(arg) {
+    var cacheHandler, clientOptions, headers, method, path;
+    clientOptions = arg.clientOptions, method = arg.method, path = arg.path;
+    headers = {};
+    cacheHandler = clientOptions.cacheHandler || this;
+    if (cacheHandler.get(method, path)) {
+      headers['If-None-Match'] = cacheHandler.get(method, path).eTag;
     } else {
-      return data;
+      headers['If-Modified-Since'] = 'Thu, 01 Jan 1970 00:00:00 GMT';
     }
+    return {
+      headers: headers
+    };
   };
 
-  CamelCase.prototype._replaceObject = function(orig) {
-    var acc, i, key, len, ref1, value;
-    acc = {};
-    ref1 = Object.keys(orig);
-    for (i = 0, len = ref1.length; i < len; i++) {
-      key = ref1[i];
-      value = orig[key];
-      this._replaceKeyValue(acc, key, value);
-    }
-    return acc;
-  };
-
-  CamelCase.prototype._replaceArray = function(orig) {
-    var arr, i, item, key, len, ref1, value;
-    arr = (function() {
-      var i, len, results;
-      results = [];
-      for (i = 0, len = orig.length; i < len; i++) {
-        item = orig[i];
-        results.push(this.replace(item));
+  CacheMiddleware.prototype.responseMiddleware = function(arg) {
+    var cacheHandler, clientOptions, data, eTag, jqXHR, method, path, ref, ref1, status;
+    clientOptions = arg.clientOptions, (ref = arg.request, method = ref.method, path = ref.path), status = arg.status, jqXHR = arg.jqXHR, data = arg.data;
+    cacheHandler = clientOptions.cacheHandler || this;
+    if (status === 304) {
+      ref1 = cacheHandler.get(method, path), data = ref1.data, status = ref1.status;
+    } else {
+      if (method === 'GET' && jqXHR.getResponseHeader('ETag')) {
+        eTag = jqXHR.getResponseHeader('ETag');
+        cacheHandler.add(method, path, eTag, data, jqXHR.status);
       }
-      return results;
-    }).call(this);
-    ref1 = Object.keys(orig);
-    for (i = 0, len = ref1.length; i < len; i++) {
-      key = ref1[i];
-      value = orig[key];
-      this._replaceKeyValue(arr, key, value);
     }
-    return arr;
+    return {
+      data: data,
+      status: status
+    };
   };
 
-  CamelCase.prototype._replaceKeyValue = function(acc, key, value) {
-    return acc[plus.camelize(key)] = this.replace(value);
-  };
-
-  return CamelCase;
+  return CacheMiddleware;
 
 })());
 
-PAGED_RESULTS = new (PagedResults = (function() {
-  function PagedResults() {}
 
-  PagedResults.prototype.responseMiddleware = function(arg) {
-    var data, discard, href, i, jqXHR, len, links, part, ref1, ref2, rel;
-    jqXHR = arg.jqXHR, data = arg.data;
-    if (Array.isArray(data)) {
-      links = jqXHR.getResponseHeader('Link');
-      ref1 = (links != null ? links.split(',') : void 0) || [];
-      for (i = 0, len = ref1.length; i < len; i++) {
-        part = ref1[i];
-        ref2 = part.match(/<([^>]+)>;\ rel="([^"]+)"/), discard = ref2[0], href = ref2[1], rel = ref2[2];
-        data[rel + "_page_url"] = href;
-      }
-      return {
-        data: data
-      };
-    }
-  };
-
-  return PagedResults;
-
-})());
-
-module.exports = {
-  CAMEL_CASE: CAMEL_CASE,
-  PAGED_RESULTS: PAGED_RESULTS
-};
-
-
-},{"./chainer":2,"./grammar":3,"./helper-promise":5,"./helper-querystring":6,"./plus":12}],9:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 var AUTHORIZATION, DEFAULT_HEADER, PATH_TEST, PREVIEW_APIS, URL_VALIDATOR, USE_POST_INSTEAD_OF_PATCH, base64encode, ref;
 
 ref = require('./grammar'), URL_VALIDATOR = ref.URL_VALIDATOR, DEFAULT_HEADER = ref.DEFAULT_HEADER;
@@ -13525,7 +13476,7 @@ module.exports = Replacer;
 
 
 },{"./chainer":2,"./grammar":3,"./helper-promise":5,"./helper-querystring":6,"./plus":12}],14:[function(require,module,exports){
-var DEFAULT_HEADER, ETagResponse, MIDDLEWARE_CACHE_HANDLER, MIDDLEWARE_REQUEST_PLUGINS, MIDDLEWARE_RESPONSE_PLUGINS, Request, _, ajax, base64encode, userAgent;
+var DEFAULT_HEADER, MIDDLEWARE_CACHE_HANDLER, MIDDLEWARE_REQUEST_PLUGINS, MIDDLEWARE_RESPONSE_PLUGINS, Request, _, ajax, base64encode, userAgent;
 
 _ = require('lodash');
 
@@ -13538,6 +13489,8 @@ MIDDLEWARE_REQUEST_PLUGINS = require('./plugin-middleware-request');
 MIDDLEWARE_RESPONSE_PLUGINS = require('./plugin-middleware-response');
 
 MIDDLEWARE_CACHE_HANDLER = require('./plugin-cache-handler');
+
+MIDDLEWARE_RESPONSE_PLUGINS['CACHE_HANDLER'] = MIDDLEWARE_CACHE_HANDLER;
 
 if (typeof window === "undefined" || window === null) {
   userAgent = 'octokat.js';
@@ -13583,19 +13536,8 @@ ajax = function(options, cb) {
   return xhr.send(options.data);
 };
 
-ETagResponse = (function() {
-  function ETagResponse(eTag1, data1, status1) {
-    this.eTag = eTag1;
-    this.data = data1;
-    this.status = status1;
-  }
-
-  return ETagResponse;
-
-})();
-
 Request = function(clientOptions) {
-  var _cachedETags, cacheHandler, emitter;
+  var emitter;
   if (clientOptions == null) {
     clientOptions = {};
   }
@@ -13609,20 +13551,8 @@ Request = function(clientOptions) {
     clientOptions.usePostInsteadOfPatch = false;
   }
   emitter = clientOptions.emitter;
-  _cachedETags = {};
-  cacheHandler = clientOptions.cacheHandler || {
-    get: function(method, path) {
-      if (_cachedETags[method + " " + path]) {
-        console.log('CACHEHANDLER GETTING ', method, path);
-      }
-      return _cachedETags[method + " " + path];
-    },
-    add: function(method, path, eTag, data, status) {
-      return _cachedETags[method + " " + path] = new ETagResponse(eTag, data, status);
-    }
-  };
   return function(method, path, data, options, cb) {
-    var acc, ajaxConfig, headers, j, len, mimeType, plugin, ref;
+    var acc, ajaxConfig, headers, j, len, mimeType, plugin, ref, ref1;
     if (options == null) {
       options = {
         isRaw: false,
@@ -13659,9 +13589,10 @@ Request = function(clientOptions) {
       clientOptions: clientOptions,
       headers: headers
     };
-    for (j = 0, len = MIDDLEWARE_REQUEST_PLUGINS.length; j < len; j++) {
-      plugin = MIDDLEWARE_REQUEST_PLUGINS[j];
-      ref = plugin.requestMiddleware(acc) || {}, method = ref.method, headers = ref.headers, mimeType = ref.mimeType;
+    ref = MIDDLEWARE_REQUEST_PLUGINS.concat([MIDDLEWARE_CACHE_HANDLER]);
+    for (j = 0, len = ref.length; j < len; j++) {
+      plugin = ref[j];
+      ref1 = plugin.requestMiddleware(acc) || {}, method = ref1.method, headers = ref1.headers, mimeType = ref1.mimeType;
       if (method) {
         acc.method = method;
       }
@@ -13679,11 +13610,6 @@ Request = function(clientOptions) {
     }
     if (options.isRaw) {
       headers['Accept'] = 'application/vnd.github.raw';
-    }
-    if (cacheHandler.get(method, path)) {
-      headers['If-None-Match'] = cacheHandler.get(method, path).eTag;
-    } else {
-      headers['If-Modified-Since'] = 'Thu, 01 Jan 1970 00:00:00 GMT';
     }
     ajaxConfig = {
       url: path,
@@ -13713,7 +13639,7 @@ Request = function(clientOptions) {
       emitter.emit('start', method, path, data, options);
     }
     return ajax(ajaxConfig, function(err, val) {
-      var acc2, converted, eTag, eTagResponse, emitterRate, i, jqXHR, json, k, key, rateLimit, rateLimitRemaining, rateLimitReset, ref1, value;
+      var acc2, converted, emitterRate, i, jqXHR, json, k, key, rateLimit, rateLimitRemaining, rateLimitReset, ref2, value;
       jqXHR = err || val;
       if (emitter) {
         rateLimit = parseFloat(jqXHR.getResponseHeader('X-RateLimit-Limit'));
@@ -13732,21 +13658,17 @@ Request = function(clientOptions) {
         emitter.emit('request', emitterRate, method, path, data, options, jqXHR.status);
       }
       if (!err) {
-        if (jqXHR.status === 304) {
-          if (clientOptions.useETags && cacheHandler.get(method, path)) {
-            eTagResponse = cacheHandler.get(method, path);
-            return cb(null, eTagResponse.data, eTagResponse.status, jqXHR);
-          } else {
-            return cb(null, jqXHR.responseText, status, jqXHR);
-          }
-        } else if (jqXHR.status === 302) {
+        if (jqXHR.status === 302) {
           return cb(null, jqXHR.getResponseHeader('Location'));
         } else if (!(jqXHR.status === 204 && options.isBoolean)) {
           if (jqXHR.responseText && ajaxConfig.dataType === 'json') {
             data = JSON.parse(jqXHR.responseText);
             acc = {
+              clientOptions: clientOptions,
               jqXHR: jqXHR,
-              data: data
+              data: data,
+              status: jqXHR.status,
+              request: acc
             };
             for (key in MIDDLEWARE_RESPONSE_PLUGINS) {
               value = MIDDLEWARE_RESPONSE_PLUGINS[key];
@@ -13759,14 +13681,10 @@ Request = function(clientOptions) {
           }
           if (method === 'GET' && options.isBase64) {
             converted = '';
-            for (i = k = 0, ref1 = data.length; 0 <= ref1 ? k < ref1 : k > ref1; i = 0 <= ref1 ? ++k : --k) {
+            for (i = k = 0, ref2 = data.length; 0 <= ref2 ? k < ref2 : k > ref2; i = 0 <= ref2 ? ++k : --k) {
               converted += String.fromCharCode(data.charCodeAt(i) & 0xff);
             }
             data = converted;
-          }
-          if (method === 'GET' && jqXHR.getResponseHeader('ETag') && clientOptions.useETags) {
-            eTag = jqXHR.getResponseHeader('ETag');
-            cacheHandler.add(method, path, eTag, data, jqXHR.status);
           }
           return cb(null, data, jqXHR.status, jqXHR);
         }
